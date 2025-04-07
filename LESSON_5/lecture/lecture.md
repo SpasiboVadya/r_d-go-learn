@@ -1,557 +1,555 @@
-# Lesson 4: `Methods and Interfaces`
+# Lesson 5 Обробка помилок
+## Підхід до роботи з помилками в Go
+![Підхід до роботи з помилками в Go](slides/1.png)
 
-# Методи `Methods`
+🔹 Підхід до роботи з помилками в Go
 
-![Methods](slides/1.png)
-
-У мові програмування Go методи дозволяють прив’язати функції до певних типів, надаючи їм можливість поводитись як методи об'єктів. Це дає змогу організовувати код, розподіляючи функціональність між різними типами даних. Розглянемо основні моменти:
-
-## **Оголошення методу**
-
-Метод в Go оголошується як функція, до якої додається так званий рецептор (receiver) — змінна, що представляє тип, до якого прив’язується метод. Наприклад:
+## ✅ 1. Помилка — це значення
+У Go помилки реалізовані як значення, що реалізують інтерфейс:
 
 ```go
-package main
-
-import "fmt"
-
-type Person struct {
-    Name string
-    Age  int
-}
-
-// Метод із value receiver (значення копіюється)
-func (p Person) Greet() {
-    fmt.Printf("Привіт, мене звати %s і мені %d років.\n", p.Name, p.Age)
-}
-
-func main() {
-    person := Person{Name: "Іван", Age: 30}
-    person.Greet() // Виклик методу
+type error interface {
+    Error() string
 }
 ```
+Тобто будь-який тип, який має метод `Error() string`, вважається помилкою.
 
-## **Pointer Receiver vs Value Receiver**
-
-- **Value Receiver**: Коли метод оголошено з value receiver, копія значення передається в метод. Це підходить, коли метод не змінює стан об’єкта.
-- **Pointer Receiver**: Використовується для методів, які можуть змінити стан об’єкта, або коли тип великий і копіювання може бути неефективним. Наприклад:
+## ✅ 2. Явна перевірка помилки
+При виклику функції, яка може повернути помилку, ти зобов'язаний її перевірити:
 
 ```go
-func (p *Person) CelebrateBirthday() {
-    p.Age++
+err := sendMessage("Hello")
+if err != nil {
+    fmt.Println("Помилка:", err)
 }
 ```
+📌 Це спонукає писати надійний код, бо ти ніколи не можеш "забути" обробити помилку.
 
-## **Використання методів для реалізації інтерфейсів**
-
-Однією з ключових особливостей Go є імплементація інтерфейсів. Якщо тип реалізує всі методи інтерфейсу, він автоматично задовольняє його, без необхідності явного оголошення. Це дозволяє створювати гнучкі та легко розширювані системи.
-
-## **Основні переваги використання методів у Go**
-
-- **Читабельність та організація коду**: Методи групують логіку, що стосується конкретного типу, що робить код більш зрозумілим.
-- **Інкапсуляція**: Хоча Go не підтримує повну інкапсуляцію, методи дозволяють обмежити доступ до даних через неекспортовані поля.
-- **Простота реалізації інтерфейсів**: Завдяки методам Go забезпечує потужну систему інтерфейсів, що дозволяє писати більш універсальний код.
-
-# Інтерфейси `Interfaces`
-
-![Interfaces](slides/2.png)
-
-В Go інтерфейси є потужним механізмом для визначення поведінки об’єктів без необхідності явної ієрархії класів (як у мовах типу Java або C#). Інтерфейс визначає набір методів, які повинен реалізовувати певний тип, і якщо тип реалізує всі методи інтерфейсу, він автоматично задовольняє цей інтерфейс.
-
-### **1. Оголошення інтерфейсу**
-
-Інтерфейси оголошуються за допомогою ключового слова `interface`.
-
+## ✅ 3. Функції повертають error як другий (часто останній) аргумент
 ```go
-package main
-
-import "fmt"
-
-// Визначаємо інтерфейс
-type Speaker interface {
-    Speak()
-}
-
-// Реалізуємо інтерфейс у структурі
-type Person struct {
-    Name string
-}
-
-// Метод Speak реалізований для Person
-func (p Person) Speak() {
-    fmt.Printf("Привіт! Я %s\n", p.Name)
-}
-
-func main() {
-    var s Speaker // Оголошуємо змінну типу інтерфейсу
-    p := Person{Name: "Іван"}
-    s = p // Присвоюємо значення, оскільки Person реалізує Speaker
-    s.Speak()
+func doSomething() (string, error) {
+    if fail {
+        return "", errors.New("щось пішло не так")
+    }
+    return "успіх", nil
 }
 ```
-
-👉 Go автоматично визначає, чи реалізує тип інтерфейс, тобто не потрібно явно вказувати, що `Person` реалізує `Speaker`.
-
-### **2. Інтерфейси з кількома методами**
-
-Інтерфейс може містити декілька методів:
-
+### 🛠 Приклади кращої практики
+## 🔸 Обгортання помилок для кращого контексту
 ```go
-type Animal interface {
-    Speak()
-    Move()
-}
-
-type Dog struct {
-    Name string
-}
-
-func (d Dog) Speak() {
-    fmt.Println("Гав-гав!")
-}
-
-func (d Dog) Move() {
-    fmt.Println("Собака біжить!")
-}
-
-func main() {
-    var a Animal
-    a = Dog{Name: "Рекс"}
-    a.Speak() // Виведе "Гав-гав!"
-    a.Move()  // Виведе "Собака біжить!"
+return fmt.Errorf("cannot send message: %w", err)
+```
+### 🔸 Використання `errors.Is()`
+```go
+if errors.Is(err, ErrNotFound) {
+    // Специфічна обробка
 }
 ```
-
-### **3. Інтерфейси з pointer receiver**
-
-Якщо методи інтерфейсу приймають `pointer receiver`, то для їх виклику потрібно використовувати саме вказівник:
-
+## 🔸 Використання `errors.As()`
 ```go
-type Counter interface {
-    Increment()
-    GetValue() int
-}
-
-type Number struct {
-    value int
-}
-
-// Використання pointer receiver дозволяє змінювати значення
-func (n *Number) Increment() {
-    n.value++
-}
-
-func (n Number) GetValue() int {
-    return n.value
-}
-
-func main() {
-    var c Counter
-    num := Number{value: 5}
-
-    // c = num ❌ Помилка, оскільки Increment має pointer receiver
-    c = &num // ✅ Потрібно передати вказівник
-    c.Increment()
-    fmt.Println(c.GetValue()) // Виведе 6
+var customErr *MyCustomError
+if errors.As(err, &customErr) {
+    // Обробка кастомної помилки
 }
 ```
+### ⚠️ Чому так зроблено?
+-  Go уникає прихованих помилок через винятки, як це буває в Java, Python або JS.
+-  Такий підхід спрощує відлагодження, зменшує "магію" та підвищує надійність.
 
-### **4. Порожній інтерфейс (`interface{}`)**
+> **_NOTE:_**💡 Dev philosophy Go: "Якщо помилка трапилася — покажи її відразу. Будь чесним."
 
-Інтерфейс `interface{}` (або `any` у Go 1.18+) є універсальним та може містити значення будь-якого типу:
+# Пакет `errors `
+![Пакет errors](slides/2.png)
+
+Пакет `errors` є стандартним інструментом для створення та роботи з помилками у Go. Його основна ідея — простота та прозорість.
+
+## ✅ 1. Створення простої помилки – errors.New
+📌 Функція errors.New() створює просту помилку з повідомленням.
 
 ```go
-func PrintValue(value interface{}) {
-    fmt.Println("Value:", value)
-}
-
-func main() {
-    PrintValue(42)
-    PrintValue("Привіт, світ!")
-    PrintValue([]int{1, 2, 3})
+func errorsNew() error {
+    return errors.New("this is a simple error")
 }
 ```
+🔍 Пояснення:
 
-Однак, для використання значень потрібно `type assertion` або `type switch`:
+- Повертається тип `error`.
+- Створена помилка не містить вкладених помилок або додаткового контексту.
+- Ідеально підходить для фіксованих помилок (наприклад: "permission denied", "not found").
+
+## ✅ 2. Форматування помилок – `fmt.Errorf`
+📌 Якщо потрібно надати додатковий контекст до помилки, використовуй fmt.Errorf.
 
 ```go
-func Describe(i interface{}) {
-    switch v := i.(type) {
-    case string:
-        fmt.Println("Це рядок:", v)
-    case int:
-        fmt.Println("Це число:", v)
-    default:
-        fmt.Println("Невідомий тип")
+var ErrUserNotFound = errors.New("user not found")
+
+func errorsFormat() error {
+    return fmt.Errorf("db err: %v", ErrUserNotFound)
+}
+```
+🧠 Пояснення:
+
+- `%v` вставляє текстове представлення `ErrUserNotFound`.
+- Але ця помилка не є обгорнутою — `errors.Is()` не спрацює.
+- Якщо потрібно передавати вкладену помилку, використовуй `%w`.
+
+```go
+return fmt.Errorf("db err: %w", ErrUserNotFound) // Тепер можна перевірити через errors.Is()
+```
+## ✅ 3. Обгортання помилок — `%w` у `fmt.Errorf`
+📌 %w обгортає помилку — дає змогу зберігати її тип.
+
+```go
+return fmt.Errorf("context info: %w", ErrUserNotFound)
+```
+➡️ Це дає змогу в іншому місці коду виконати:
+
+```go
+if errors.Is(err, ErrUserNotFound) {
+    // специфічна обробка
+}
+```
+## ✅ 4. Гарна практика: закриття ресурсів з обробкою помилки
+
+```go
+defer func() {
+    if err := file.Close(); err != nil {
+        fmt.Println(err)
+        os.Exit(1)
+    }
+}()
+```
+📌 Це гарантує, що файл буде закритий незалежно від того, як завершиться функція `main().`
+
+🧩 Загальна структура для роботи з помилками
+```go
+func doSomething() error {
+    file, err := os.Open("example.txt")
+    if err != nil {
+        return fmt.Errorf("cannot open file: %w", err)
+    }
+    defer file.Close()
+
+    // ... робота з файлом ...
+
+    return nil
+}
+```
+🎯 Висновок
+
+- `errors.New("msg")`	Створення простої помилки
+- `fmt.Errorf("text: %w", err)`	Обгортання помилки з контекстом
+- `errors.Is(err, target)`	Перевірка вкладеної помилки
+- `errors.As(err, &targetType)`	Отримання конкретного типу помилки
+- `errors.Unwrap(err)`	Дістає вкладену помилку з обгортки
+
+
+
+
+# Custom Errors
+![Custom Errors](slides/3.png)
+
+🎨 Custom Errors у Go (Користувацькі помилки)
+🔹 Навіщо це потрібно?
+- Додаткова інформація: код, поле, лог рівень тощо.
+- Можливість обробляти помилки специфічного типу (errors.As).
+- Краще логування або UI-відповіді в API.
+
+## ✅ 1. Створення власного типу помилки
+
+```go
+type CustomError struct {
+    Message string
+    Code    int
+}
+```
+Це просто структура, яка містить додаткові поля.
+
+## ✅ 2. Реалізація інтерфейсу `error`
+Щоб тип вважався помилкою, потрібно реалізувати метод:
+
+```go
+func (c CustomError) Error() string {
+    return fmt.Sprintf("code %d: %s", c.Code, c.Message)
+}
+```
+🔔 Метод `Error()` — це те, що побачить `fmt.Println(err)`
+
+## ✅ 3. Використання кастомної помилки
+```go
+func doSomething() error {
+    return CustomError{
+        Code:    500,
+        Message: "Something went wrong",
     }
 }
 
 func main() {
-    Describe("Hello")
-    Describe(100)
-    Describe(3.14)
-}
-```
-
-### **5. Композиція інтерфейсів**
-
-Go дозволяє створювати складні інтерфейси на основі інших:
-
-```go
-type Reader interface {
-    Read() string
-}
-
-type Writer interface {
-    Write(data string)
-}
-
-// Композиція інтерфейсів
-type ReadWriter interface {
-    Reader
-    Writer
-}
-```
-
-Тепер будь-який тип, який реалізує `Read` і `Write`, автоматично реалізовує `ReadWriter`.
-
-### **6. Порожній інтерфейс як будь-який тип**
-
-Інколи корисно приймати будь-який тип за допомогою `interface{}`:
-
-```go
-func PrintAnything(data interface{}) {
-    fmt.Println(data)
-}
-
-func main() {
-    PrintAnything(42)
-    PrintAnything("Hello, World!")
-    PrintAnything([]int{1, 2, 3})
-}
-```
-
-Але Go 1.18+ надає кращий підхід — **узагальнені (generic) типи**.
-
-### **7. Порівняння інтерфейсів у Go**
-
-Інтерфейси можна порівнювати:
-
-```go
-var a, b Speaker
-fmt.Println(a == b) // true, якщо обидва nil
-```
-
-Але якщо змінна містить `nil`-значення конкретного типу, вона не вважається `nil`:
-
-```go
-var p *Person
-var s Speaker = p
-fmt.Println(s == nil) // false
-```
-
-Щоб перевірити, чи інтерфейс має значення `nil`, потрібно перевірити його конкретний тип:
-
-```go
-if s == nil || (reflect.ValueOf(s).IsNil()) {
-    fmt.Println("s дійсно nil")
-}
-```
-
-# Any `Any`
-
-![struct](slides/3.png)
-
-## **Що таке `any` у Go?**
-
-Починаючи з **Go 1.18**, з'явився новий псевдонім `any`, який є просто синонімом для `interface{}`. Це означає, що `any` може містити значення будь-якого типу, як і `interface{}.`
-
-**Приклад використання `any`**
-
-```go
-package main
-
-import "fmt"
-
-func PrintValue(value any) {
-    fmt.Println("Value:", value)
-}
-
-func main() {
-    PrintValue(42)
-    PrintValue("Hello, Go!")
-    PrintValue([]int{1, 2, 3})
-}
-```
-
-- ⚡ Важливо: `any` — це просто зручна заміна `interface{}`, тому ви можете використовувати його так само.
-
-## **Чому введено `any`?**
-
-До `Go 1.18` для визначення змінних, що можуть зберігати значення будь-якого типу, використовували `interface{}`:
-
-```go
-var value interface{} = "Hello"
-```
-
-Але таке позначення виглядає не дуже зручно, тому з’явився псевдонім `any`, що робить код більш зрозумілим:
-
-```go
-var value any = "Hello"
-```
-
-**Go team вирішила, що `any` краще відображає намір коду та робить його читабельнішим.**
-
-## **Тип `any` та `Type Assertion`**
-
-Оскільки `any` (як і `interface{}`) може містити значення будь-якого типу, потрібно **явно приводити його до потрібного типу перед використанням**:
-
-```go
-func Describe(value any) {
-    str, ok := value.(string)
-    if ok {
-        fmt.Println("Це рядок:", str)
-    } else {
-        fmt.Println("Не рядок")
+    if err := doSomething(); err != nil {
+        fmt.Println(err) // Виведе: code 500: Something went wrong
     }
 }
-
-func main() {
-    Describe("Go")
-    Describe(42)
-}
 ```
-
-## **Type assertion з перевіркою (`ok`)**
-
-- Якщо приведення успішне, `ok` буде `true`.
-- Якщо приведення невдале, `ok` буде `false`.
-
-## **Тип `any` та `Type Switch`**
-
-Якщо потрібно обробляти значення різних типів, можна використовувати `switch`:
-
+## 🔍 4. Вилучення кастомної помилки через errors.As()
 ```go
-func IdentifyType(value any) {
-    switch v := value.(type) {
-    case string:
-        fmt.Println("Це рядок:", v)
-    case int:
-        fmt.Println("Це число:", v)
-    case bool:
-        fmt.Println("Це булеве значення:", v)
-    default:
-        fmt.Println("Невідомий тип")
+func main() {
+    err := doSomething()
+
+    var customErr CustomError
+    if errors.As(err, &customErr) {
+        fmt.Printf("Handle error with code: %d\n", customErr.Code)
     }
 }
-
-func main() {
-    IdentifyType("Hello")
-    IdentifyType(100)
-    IdentifyType(true)
-}
 ```
+✅ Це дозволяє перевірити й дістати поля без приведення типів вручну.
 
-## **Тип `any` у мапах, списках, структурах**
-
-Оскільки `any` може містити будь-який тип, його зручно використовувати у структурах або динамічних колекціях.
-
-Зберігання різних типів у `map[string]any`
+## 🛠 Альтернатива: вказівник
+Якщо хочеш мати можливість використовувати `errors.Is()` чи зберігати референс на помилку:
 
 ```go
-package main
+func (c *CustomError) Error() string {
+    return fmt.Sprintf("code %d: %s", c.Code, c.Message)
+}
+```
+Тоді функція має повертати` &CustomError{...}`.
 
-import "fmt"
+🎯 Резюме
 
-func main() {
-    data := map[string]any{
-        "name":    "Іван",
-        "age":     30,
-        "isAdmin": true,
+- `type MyError struct`	Створення власного типу помилки
+- `func (e MyError) Error() string`	Реалізація інтерфейсу error
+- `return MyError{...}`	Повернення помилки
+- `errors.As(err, &myErr)`	Витяг конкретного типу помилки
+
+
+# 🧵 Error Wrappers (Go 1.13+): errors.Is()
+![Error Wrappers](slides/4.png)
+- 🔹 Що таке обгортання (wrapping) помилок?
+
+Go дозволяє створювати “ланцюжок” помилок — коли одна помилка обгортає іншу, додаючи контекст, але зберігаючи суть.
+
+```go
+return fmt.Errorf("failed to get user: %w", err)
+```
+- `%w` означає: обгорнути помилку, щоб її можна було потім дістати через errors.Is() або errors.Unwrap().
+
+## ✅ 1. Використання `errors.Is(err, target)`
+```go
+if errors.Is(err, ErrDbError) {
+    fmt.Println("this is db error")
+}
+```
+🔍 Це перевірка, чи міститься в ланцюжку помилок `ErrDbError`.
+
+Працює навіть якщо ми її обгорнули кілька разів:
+
+```go
+return fmt.Errorf("1st wrap: %w", fmt.Errorf("2nd wrap: %w", ErrDbError))
+```
+
+## ✅ 2. Приклад на твоєму коді (пояснення)
+```go
+var ErrDbError = errors.New("database error")
+
+func callDB() error {
+    return ErrDbError
+}
+
+func getUser() error {
+    if err := callDB(); err != nil {
+        return fmt.Errorf("failed to get user: %w", err)
     }
-
-    fmt.Println(data["name"])  // Виведе: Іван
-    fmt.Println(data["age"])   // Виведе: 30
-    fmt.Println(data["isAdmin"]) // Виведе: true
+    return nil
 }
 ```
-
-### **Тип `any` та Generic-функції**
-
-`Go 1.18` також додав generics, які часто використовуються разом із `any`. Наприклад:
+Потім:
 
 ```go
-func PrintSlice[T any](items []T) {
-    for _, item := range items {
-        fmt.Println(item)
+err := getUser()
+
+if errors.Is(err, ErrDbError) {
+    fmt.Println("this is db error")
+}
+```
+➡️ Хоча `getUser()` повертає обгорнуту помилку, `errors.Is()` “розпаковує” її, порівнюючи вкладену.
+
+🧩 3. Пояснення `Unwrap()`
+Іноді ти хочеш явно дістати “внутрішню” помилку:
+
+```go
+baseErr := errors.Unwrap(err)
+fmt.Println(baseErr) // Виведе: database error
+```
+### 🧠 Навіщо це потрібно?
+
+- Обробка відомих помилок	`errors.Is(err, ErrPermissionDenied)`
+- Розбір кастомних помилок	`errors.As(err, *MyCustomError)`
+- Додавання контексту до помилки	`fmt.Errorf("some context: %w", err)`
+### 🎯 Висновки
+- ✅ `fmt.Errorf("...: %w", err)` — обгортає помилку
+- ✅ `errors.Is(err, target)` — перевіряє, чи є target серед вкладених помилок
+- ✅ `errors.Unwrap(err`) — дістає першу вкладену помилку (можна "розмотувати" вручну)
+- ✅ Працює рекурсивно: `errors.Is()` перевіряє всі рівні вкладень
+
+# Error Wrappers (Go 1.13+): `errors.As()`
+![Error Wrappers](slides/5.png)
+
+- Що таке errors.As()?
+Це функція, яка дозволяє перевірити, чи обгорнута помилка є певного типу — і достати її.
+
+## ✅ 1. Синтаксис `errors.As(err, &target)`
+```go
+var myErr MyError
+if errors.As(err, &myErr) {
+    // тепер можна використовувати поля з myErr
+}
+```
+☑️ &myErr має бути вказівником на тип (або інтерфейс), що реалізує error.
+
+## ✅ 2. Приклад з твого коду
+🧱 Створення кастомної помилки:
+```go
+type CustomError struct {
+    Code    int
+    Message string
+}
+
+func (c CustomError) Error() string {
+    return fmt.Sprintf("code %d: %s", c.Code, c.Message)
+}
+```
+🔁 Обгортання помилки:
+```go
+func getUser() error {
+    if err := callDB(); err != nil {
+        return fmt.Errorf("failed to get user: %w", err)
     }
-}
-
-func main() {
-    PrintSlice([]int{1, 2, 3})
-    PrintSlice([]string{"A", "B", "C"})
+    return nil
 }
 ```
+`%w` обгортає `CustomError` всередині `fmt.Errorf`.
 
-- ✅ Висновок: Generics — більш зручний підхід у багатьох випадках, де раніше використовували `any`.
-
-## **Коли варто використовувати `any`?**
-
-- ✅ Коли потрібно зберігати будь-який тип (наприклад, у `map[string]any`).
-- ✅ Коли функція або метод повинні працювати з різними типами (`interface{}` раніше виконував цю роль).
-- ✅ Коли потрібно передавати значення невідомого типу (наприклад, у логуваннях).
-- ❌ Не варто використовувати any, якщо можна застосувати generics.
-
-Підсумки
-
-- `any` — це псевдонім для `interface{}`, який робить код читабельнішим.
-- Використовується там, де потрібно працювати з довільними типами.
-- Підтримує type assertion (`value.(string)`) та `type switch`.
-- Краще використовувати generics, якщо можливо.
-
-# **Дженерики `generics`**
-
-![generics](slides/4.png)  
-
-## Що таке generics у Go?
-
-Generics (узагальнені типи) були додані в `Go 1.18`, і вони дозволяють писати функції та структури, які можуть працювати з будь-якими типами без втрати типобезпеки. Раніше, щоб зробити функцію універсальною, доводилося використовувати `interface{}` або створювати кілька варіантів однієї функції для різних типів.
-
-Generics дозволяють визначати узагальнені (generic) типи, які можуть бути замінені конкретними типами під час компіляції.
-
-## **1. Синтаксис generic-функцій**
-
-Generic-функція визначається за допомогою **параметра типу `T`**, який зазначається в квадратних дужках `[]` перед списком параметрів функції:
-
+## 🔍 Витяг типу помилки через `errors.As()`
 ```go
-package main
-
-import "fmt"
-
-// Узагальнена функція, яка приймає будь-який тип T
-func PrintValue[T any](value T) {
-    fmt.Println("Value:", value)
-}
-
-func main() {
-    PrintValue(42)        // Виведе: Value: 42
-    PrintValue("Hello")   // Виведе: Value: Hello
-    PrintValue(true)      // Виведе: Value: true
+var customErr CustomError
+if errors.As(err, &customErr) {
+    fmt.Printf("this is db error: %d, %s\n", customErr.Code, customErr.Message)
 }
 ```
+🔎 Go пройде по ланцюжку обгорнутих помилок, знайде `CustomError`, і присвоїть його в `customErr`.
 
-- Тут `[T any]` означає, що `T` — це узагальнений тип, який може бути будь-яким (`any` — це псевдонім для `interface{}`).
+💡 Для чого використовувати `As()`?
 
-## **2. Generic-функція для роботи з масивами**
+- Хочеш дістати додаткові поля помилки	`errors.As()`
+- Помилка має спеціальний тип (наприклад, ValidationError)	`errors.As()`
+- Потрібна кастомна логіка на основі коду	`errors.As()` дає доступ до `.Code` тощо
 
+
+
+# `errors.Join()` — Go 1.20+
+![errors.Join()](slides/6.png)
+
+📌 Що це?
+
+Функція `errors.Join(errs...)` дозволяє об'єднати декілька помилок в одну. Це зручно, коли виникає кілька помилок одночасно, наприклад:
+
+- перевірка кількох валідаційних умов,
+- кілька запитів до бази,
+- кілька API-викликів тощо.
+
+## ✅ Синтаксис
 ```go
-func PrintSlice[T any](items []T) {
-    for _, item := range items {
-        fmt.Println(item)
+return errors.Join(err1, err2, err3)
+```
+Якщо всі `err == nil`, то `errors.Join()` поверне `nil`.
+
+## ✅ Приклад з твого скріншоту
+```go
+func ErrorJoins() error {
+    errs := make([]error, 0)
+    for i := 0; i < 10; i++ {
+        errs = append(errs, callDB()) // callDB() повертає помилки
     }
-}
-
-func main() {
-    PrintSlice([]int{1, 2, 3})          // Працює з int
-    PrintSlice([]string{"A", "B", "C"}) // Працює з string
+    return errors.Join(errs...)
 }
 ```
+🔍 Цей приклад збирає 10 помилок (умовно) та обʼєднує їх в одну.
 
-- ✅ Ця функція працює як для `[]int`, так і для `[]string`, не потребуючи дублікації коду.
+### 🔎 Робота з обʼєднаними помилками
+🔸 `errors.Is()`
 
-## **3. Використання кількох типів у generics**
-
-Generic-функції можуть приймати кілька узагальнених типів:
+Перевіряє, чи будь-яка з обʼєднаних помилок є цільовою:
 
 ```go
-func Pair[T, U any](first T, second U) {
-    fmt.Printf("First: %v, Second: %v\n", first, second)
-}
-
-func main() {
-    Pair(42, "Hello")  // First: 42, Second: Hello
-    Pair(true, 3.14)   // First: true, Second: 3.14
+if errors.Is(err, ErrDbError) {
+    fmt.Println("At least one DB error occurred")
 }
 ```
+🔸 `errors.As()`
 
-- Тут `[T, U any]` означає, що `T` і `U` можуть бути будь-якими типами.
-
-## **4. Обмеження типів (type constraints)**
-
-Якщо потрібно обмежити generic-тип лише числами (int, float), можна використати `constraints` з пакета golang.org/x/exp/constraints або створити власний інтерфейс:
+Можна знайти будь-яку конкретну помилку певного типу серед усіх з'єднаних:
 
 ```go
-import "golang.org/x/exp/constraints"
-
-// Обмежуємо типи тільки числами
-func Sum[T constraints.Ordered](a, b T) T {
-    return a + b
-}
-
-func main() {
-    fmt.Println(Sum(3, 5))      // 8 (int)
-    fmt.Println(Sum(2.5, 3.5))  // 6 (float)
+var cerr CustomError
+if errors.As(err, &cerr) {
+    fmt.Println("Custom error detected:", cerr.Code)
 }
 ```
 
--✅ `constraints.Ordered` означає, що `T` може бути лише числовим (`int`, `float` або `string`).
+🎯 Висновок
+- `errors.Join()` — нова зручна фіча в Go 1.20+
+- Обʼєднує кілька помилок в одну
+- Працює з `Is`, `As`, `Unwrap`
+- Повертає `nil`, якщо всі передані помилки — `nil`
 
-## **5. Узагальнені (generic) структури**
 
-Generics працюють не тільки у функціях, а й у структурах:
+## panic
+![panic](slides/7.png)
+
+### ⚠️ panic у Go — аварійне завершення виконання
+
+panic — це механізм у Go для сигналізації про фатальну помилку, яка перериває виконання програми.
+
+- Після виклику panic, Go:
+- Прекращає звичайне виконання.
+- Запускає відкладені (defer) функції.
+- Виводить stack trace.
+- Завершує програму.
+
+## ✅ Коли варто використовувати panic
+
+- `Програмна помилка`	Щось, що ніколи не повинно статися (наприклад, ділення на 0, або недопустимий enum)
+- `Неможливість відновлення`	Зламаний інваріант, невірна конфігурація, критичний assert
+- `Внутрішні помилки`	У бібліотеках або під час генерації коду
+## 📌 Приклад 1: ділення на нуль
+```go
+func main() {
+	div := 0
+	inf := 42 / div // panic: integer divide by zero
+	fmt.Println(inf)
+}
+```
+🔴 Результат: Go викликає panic, бо ділення на нуль — фатальна помилка для цілого типу.
+
+## 📌 Приклад 2: обмежене значення (enum / whitelist)
+```go
+var allowedStatuses = map[string]struct{}{
+	"running":   {},
+	"succeeded": {},
+	"failed":    {},
+}
+
+func updateStatus(status string) {
+	if _, ok := allowedStatuses[status]; !ok {
+		panic("invalid status") // порушення логіки програми
+	}
+}
+```
+🔴 Тут panic застосовується, якщо передано неприпустиме значення. Це часто використовують для перевірки інваріантів.
+
+## 🧵 Як працює з defer
+```go
+func main() {
+	defer fmt.Println("defer executed")
+	panic("fatal error")
+}
+```
+🔸 Перед завершенням panic, виконаються всі defer-блоки — це дає шанс звільнити ресурси або записати лог.
+
+## 🛡 Як відновити виконання — recover()
+Go надає можливість перехопити panic і відновити виконання програми:
 
 ```go
-type Box[T any] struct {
-    value T
-}
-
-func (b Box[T]) GetValue() T {
-    return b.value
-}
-
-func main() {
-    intBox := Box[int]{value: 100}
-    stringBox := Box[string]{value: "Hello"}
-
-    fmt.Println(intBox.GetValue())   // 100
-    fmt.Println(stringBox.GetValue()) // Hello
+func safeFunc() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered from panic:", r)
+		}
+	}()
+	panic("boom!")
 }
 ```
+📌 Використовується рідко, зазвичай — у middleware, горутинах або фреймворках.
 
-- ✅ Так можна створювати узагальнені контейнери, що працюють з будь-якими типами.
+❌ Коли не варто використовувати panic
 
-## **6. Узагальнені (generic) методи**
+- `Очікувана помилка`	Повернути error
+- `Некоректний ввід`	Валідація + error
+- `Робота з файлами, мережею, БД`	error перевірка — завжди краще ніж panic
+## ✅ Висновок
+- `panic` — це інструмент для фатальних, невиправних помилок
+- Викликає аварійне завершення, але спочатку виконує всі `defer`
+- Може бути перехоплений через `recover()`
+- Використовуй з обережністю: тільки тоді, коли програма не може продовжити роботу
 
-Методи також можуть бути узагальненими:
 
+## PANIC RECOVERY
+![PANIC RECOVERY](slides/8.png)
+🛡️ Функція `recover()` у Go
+
+`recover()` — це вбудована функція Go, яка дозволяє перехопити panic всередині `defer`-функції.
+
+✅ Якщо її викликати поза `defer`, вона повертає `nil` і нічого не робить.
+
+## ✅ Типовий шаблон використання:
 ```go
-type Container[T any] struct {
-    items []T
-}
-
-func (c *Container[T]) Add(item T) {
-    c.items = append(c.items, item)
-}
-
-func (c Container[T]) GetAll() []T {
-    return c.items
-}
-
-func main() {
-    numbers := Container[int]{}
-    numbers.Add(10)
-    numbers.Add(20)
-    
-    fmt.Println(numbers.GetAll()) // [10 20]
+func safeFunc() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered from panic:", r)
+		}
+	}()
+	
+	panic("boom!") // буде перехоплено
 }
 ```
+📌 Після виклику panic, recover() зчитує його значення, зупиняє аварійне завершення — і код продовжує працювати.
 
-- ✅ `Container[int]` працює тільки з `int`, але можна створити `Container[string]` для збереження рядків.
+## ✅ Приклад із поверненням `error`
+```go
+func handleRequest() (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			fmt.Printf("recovered from panic: %v\n", e)
+			err = fmt.Errorf("recovered from panic: %v", e)
+		}
+	}()
+	
+	// ... тут може трапитись panic ...
+	
+	return nil
+}
+```
+🔍 Пояснення:
 
-### **Висновки**
+- `err` оголошено як іменований результат — це дає змогу встановити його значення всередині `defer`.
+- Якщо трапиться `panic`, він буде перехоплений і перетворений у `error`.
+- Функція завершиться нормально, не впаде.
 
-- ✅ Generics дозволяють створювати універсальні функції та структури без втрати типобезпеки.
-- ✅ Можна обмежувати типи за допомогою constraints (constraints.Ordered).
-- ✅ Generics усувають необхідність використання interface{} (any) для узагальнених функцій.
-- ✅ Generics покращують продуктивність, оскільки компілятор підставляє конкретні типи.
-- ✅ Підтримується для функцій, структур, методів.
+📦 Use-case: Middleware для HTTP-серверів
+```go
+func RecoverMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered: %v", r)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+```
+📌 Один `panic` у `handler`'і не зруйнує весь сервер — просто повернеться 500.
+
+⚠️ Правила використання `recover()`
+Правило	Пояснення
+- ✅ Використовуй тільки в defer	Інакше recover() нічого не зробить
+- ✅ Перетворюй panic на error, якщо логіка цього потребує	
+- ❌ Не лови panic, якщо не впевнений, що знаєш, як з нею впоратись	
+- ❌ Не ховай серйозні помилки, які варто виправити	
+
+🧠 Висновок
+- `recover()` — інструмент для контрольованого перехоплення panic
+- Працює тільки в парі з `defer`
+- Дозволяє перетворити panic у помилку
+- Класичне застосування: обгортки, middleware, горутини
