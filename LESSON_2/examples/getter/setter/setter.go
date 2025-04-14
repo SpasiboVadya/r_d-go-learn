@@ -1,0 +1,5 @@
+package setter
+
+func Setter() {
+
+}
